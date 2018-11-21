@@ -46,34 +46,56 @@ def initialize(info):
 def play():
 	validGame=True
 	player="UPPER"
-	move_idx=0
 	if State['Mode']=='i':
 		display()
 
 	endReason=''
 	stepCnt=0
+	inCheck=False
+	solutions=[]
 	while validGame:
-		# check checkmate situation
-		'''
-		if checkmate(player):
-			print 'checkmate for %s' % player
-			# find available moves
-		'''
-
 		# switch side
-		player='lower' if player=='UPPER' else 'UPPER'
+		player=opponent(player)
+
+		# check checkmate situation
+		# print 'debug: checkmate(%s)' % player
+		inCheck=False
+		threats=checkmate(player)
+		# print 'debug: threats: %s' % threats
+		solutions=[]
+		if len(threats)>0:
+			inCheck=True
+			# find available moves for player
+			solutions=solveCheck(player,threats)
+
+			if State['Mode']=='i' and len(solutions)>0:
+				displaySolutions(player,solutions)
+			if len(solutions)==0:
+				player=opponent(player)
+				endReason=config.CHECK_MSG
+				validGame=False
+				break
+		
+		# check move limit
+		if validGame and stepCnt==config.MOVE_LIMIT:
+			player=opponent(player)
+			endReason=config.TIE_MSG
+			validGame=False
+			break
 
 		# read in next move (-i,-f)
 		if State['Mode']=="i":
 			move=raw_input(player+'> ').split(' ')
 			displayAction(player,move)
 		else:
-			move=State['Moves'][move_idx].split(' ')
-			move_idx+=1
-			if move_idx>=len(State['Moves']):
+			if stepCnt>=len(State['Moves']):
+				player=opponent(player)
 				validGame=False
+				break
+			else:
+				move=State['Moves'][stepCnt].split(' ')
 
-		# verify validity of the move
+		# verify the move
 		if validMove(move,player):
 			# execute the move
 			executeMove(move,player)
@@ -84,21 +106,20 @@ def play():
 			# game over
 			endReason=config.ILLEGAL_MSG
 			validGame=False
-
-		# check move limit
-		if (validGame or endReason=='') and stepCnt==config.MOVE_LIMIT:
-			endReason=config.TIE_MSG
-			validGame=False
-			
 	
+	# handling game result
 	if State['Mode']=='f':
 		displayAction(player,move)
 		display()
 		if endReason==config.TIE_MSG:
 			print endReason
-		elif endReason!='':
+		elif endReason==config.ILLEGAL_MSG:
 			print '%s player wins.  %s' % (opponent(player),endReason)
+		elif endReason==config.CHECK_MSG:
+			print '%s player wins.  %s' % (player,endReason)
 		else:
+			if inCheck:
+				displaySolutions(opponent(player),solutions)
 			print '%s> ' % opponent(player)
 	else:
 		print 'Illegal Move'
@@ -152,6 +173,17 @@ def validMove(move,player):
 			#print 'debug:canMove=False'
 			return False
 
+		# cannot move into check
+		tmp=get(endPos)
+		piece=get(begPos)
+		set(begPos,'')
+		set(endPos,piece)
+		inCheck=len(checkmate(player))>0
+		set(begPos,piece)
+		set(endPos,tmp)
+		if inCheck:
+			return False
+
 	else:
 		# for "drop", NOTE: all piece inputs are in lowercase here
 		piece=move[1]
@@ -172,7 +204,7 @@ def validMove(move,player):
 			return False
 		if piece=='p':
 			set(endPos,piece)
-			if checkmate(opponent(player)):
+			if len(checkmate(opponent(player)))>0:
 				set(endPos,'')
 				return False
 			set(endPos,'')
@@ -215,6 +247,8 @@ def executeMove(move,player):
 		endPos=move[2]
 		set(endPos,removeFromCapture(player,piece))
 
+# display functions
+
 def display():
 	print(utils.stringifyBoard(State['Board']))
 	print("Captures UPPER: %s" % " ".join(State['Cap_U']))
@@ -222,6 +256,10 @@ def display():
 
 def displayAction(player,move):
 	print '%s player action: %s' % (player," ".join(move))
+
+def displaySolutions(player,solutions):
+	print '%s player is in check!\nAvailable moves:' % player
+	print '\n'.join(solutions)
 
 # helper methods
 
@@ -245,25 +283,88 @@ def removeFromCapture(player,piece):
 		State['Cap_U'].remove(piece)
 	return piece
 
-# check if the player is checkmated by opponent
+# check if the player in check, return threats
 def checkmate(player):
-	# find the king
+	kingPos=getKingPos(player)
+
+	# check if opponent's any pieces can take over the king
+	threats=[]
+	for i in range(0,5):
+		for j in range(0,5):
+			piece=get_ij(i,j)
+			if piece!='' and piece.islower()!=player.islower():
+				pos=ijToPos(i,j)
+				if canMove(pos,kingPos):
+					threats.append(pos)
+	return threats
+
+def solveCheck(player,threats):
+	'''
+	Ways to solve check
+	1) remove king from danger
+	2) capture the piece that threatens the king (infeasible if there're multiple threats)
+	3) put another piece between the king and the threat (infeasible if multiple threats)
+	?) do solutions contain promotions?
+	'''
+	#print 'debug: threats=%s' % threats
+	solutions=[]
+	dropPoses=[]
+	kingPos=getKingPos(player)
+	if len(threats)==1:
+		dropPoses=checkRoute(getRow(threats[0]),getCol(threats[0]),getRow(kingPos),getCol(kingPos))
+		#print 'debug: dropPoses=%s' % dropPoses
+	for i in range(0,5):
+		for j in range(0,5):
+			piece=get_ij(i,j)
+			piece_type=piece.lower()
+			pos=ijToPos(i,j)
+			if piece!='' and piece.islower()==player.islower():
+				# try 'move's
+				if piece_type=='k' or len(threats)==1:
+					for m in config.MoveRules[piece_type]:
+						nextPos=ijToPos(i+m[0],j+m[1])
+						moveOption=['move',pos,nextPos]
+						if validMove(moveOption,player):
+							tmp=get(nextPos)
+							set(nextPos,piece)
+							set(pos,'')
+							if len(checkmate(player))==0:
+								solutions.append(' '.join(moveOption))
+							set(nextPos,tmp)
+							set(pos,piece)
+			elif piece=='' and len(threats)==1 and [i,j] in dropPoses:
+				# try 'drop's
+				#print 'debug: try drop at %d,%d' % (i,j)
+				CapList=State['Cap_l'] if player=='lower' else State['Cap_U']
+				for cap_p in CapList:
+					moveOption=['drop',cap_p.lower(),pos]
+					if validMove(moveOption,player):
+						solutions.append(' '.join(moveOption))
+	solutions.sort()
+	return solutions
+
+# return a list of positions between threat and king
+def checkRoute(threat_i,threat_j,king_i,king_j):
+	#print 'debug: checkRoute %d,%d -> %d,%d' % (threat_i,threat_j,king_i,king_j)
+	routes=[]
+	diff=[king_i-threat_i,king_j-threat_j]
+	di=0 if diff[0]==0 else diff[0]/abs(diff[0])
+	dj=0 if diff[1]==0 else diff[1]/abs(diff[1])
+	i=threat_i+di
+	j=threat_j+dj
+	while i!=king_i or j!=king_j:
+		routes.append([i,j])
+		i+=di
+		j+=dj
+	return routes
+
+def getKingPos(player):
 	king='k' if player=='lower' else 'K'
 	for i in range(0,5):
 		for j in range(0,5):
 			if State['Board'][i][j]==king:
-				kingPos=chr(ord('a')+j)+str(i+1)
-				break
-
-	# check if opponent's any pieces can take over the king
-	for i in range(0,5):
-		for j in range(0,5):
-			piece=State['Board'][i][j]
-			if piece!='' and piece.islower()!=king.islower():
-				pos=chr(ord('a')+j)+str(i+1)
-				if canMove(pos,kingPos):
-					return True
-	return False
+				return ijToPos(i,j)
+	return ''
 
 def opponent(player):
 	return 'lower' if player=='UPPER' else 'UPPER'
@@ -294,13 +395,15 @@ def inPromotionZone(pos,player):
 # check if the piece on begPos can be moved to endPos in one step
 def canMove(begPos,endPos):
 	piece=get(begPos)
+	# print 'debug: piece=%s' % piece
 	piece_type=piece.lower()
+	# print 'debug: piece_type=%s' % piece_type
 	diff=[]
 	if piece.islower():
 		diff=[ord(begPos[1])-ord(endPos[1]),ord(endPos[0])-ord(begPos[0])]
 	else:
 		diff=[ord(endPos[1])-ord(begPos[1]),ord(endPos[0])-ord(begPos[0])]
-	
+	# print 'debug: diff=%s' % diff
 	if piece_type=='k':
 		return canMove_k(begPos,endPos,diff)
 	elif piece_type=='g':
@@ -318,6 +421,8 @@ def canMove(begPos,endPos):
 	elif piece_type=='+b':
 		return canMove_b(begPos,endPos,diff) or canMove_k(begPos,endPos,diff)
 	elif piece_type=='+r':
+		# print 'debug: canMove_r, begPos=%s,endPos=%s' % (begPos,endPos)
+		# print 'debug: canMove_r=%r' % canMove_r(begPos,endPos,diff)
 		return canMove_r(begPos,endPos,diff) or canMove_k(begPos,endPos,diff)
 	elif piece_type=='+p':
 		return canMove_g(begPos,endPos,diff)
@@ -338,6 +443,7 @@ def canMove_p(begPos,endPos,diff):
 def canMove_r(begPos,endPos,diff):
 	if diff[0]!=0 and diff[1]!=0:
 		return False;
+	#print 'debug: canMove_r beg:%s, end:%s' % (begPos,endPos)
 	return canMove_rb(begPos,endPos,diff)
 
 def canMove_b(begPos,endPos,diff):
@@ -350,13 +456,17 @@ def canMove_rb(begPos,endPos,diff):
 	di=0 if diff[0]==0 else diff[0]/abs(diff[0])
 	dj=0 if diff[1]==0 else diff[1]/abs(diff[1])
 	di=-di if piece.islower() else di
-	i=ord(begPos[1])-ord('1')
-	j=ord(begPos[0])-ord('a')
-	while i!=getRow(endPos) and j!=getCol(endPos):
-		i+=di
-		j+=dj
+	
+	i=getRow(begPos)+di
+	j=getCol(begPos)+dj
+	# print 'debug: canmove_rb,%d,%d' % (i,j)
+	# print 'debug: canmove_rb,end,%d,%d' % (getRow(endPos),getCol(endPos))
+	while i!=getRow(endPos) or j!=getCol(endPos):
+		# print 'debug: canmove_rb,while,%d,%d' % (i,j)
 		if State['Board'][i][j]!='':
 			return False
+		i+=di
+		j+=dj
 	return True
 
 def pieceOwner(pos):
@@ -373,8 +483,14 @@ def pieceOwner(pos):
 def set(pos,piece):
 	State['Board'][getRow(pos)][getCol(pos)]=piece
 
+def set_ij(i,j,piece):
+	State['Board'][i][j]=piece
+
 def get(pos):
 	return State['Board'][getRow(pos)][getCol(pos)]
+
+def get_ij(i,j):
+	return State['Board'][i][j]
 
 def getRow(pos):
 	return ord(pos[1])-ord('1')
@@ -384,6 +500,12 @@ def getCol(pos):
 
 def inRange(pos):
 	return len(pos)==2 and pos[0] in ('a','b','c','d','e') and pos[1] in ('1','2','3','4','5')
+
+def inRange_ij(i,j):
+	return 0<=i<5 and 0<=j<5
+
+def ijToPos(i,j):
+	return chr(ord('a')+j)+str(i+1)
 
 
 if __name__=="__main__":
