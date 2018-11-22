@@ -1,7 +1,7 @@
 '''
 Author: Anjie Wang
-File: py
-Descrition: 
+File: checkmateHandler.py
+Descrition: implement checkmate-related methods
 '''
 
 from board import Board
@@ -10,23 +10,22 @@ import verification
 import config
 
 
-# check if the player in check, return threats
-
+# check if the player in check, return a list of positions of opponent's pieces that threats the 'king'
 def checkmate(player,board):
 	kingPos=board.getKingPos(player)
 
 	# check if opponent's pieces can threat the king
 	threats=[]
-	for i in range(0,5):
-		for j in range(0,5):
+	for i in range(0,config.BOARD_SIZE):
+		for j in range(0,config.BOARD_SIZE):
 			piece=board.get_ij(i,j)
-			if piece!='' and piece.islower()!=player.islower():
+			if piece!='' and not verification.ownPiece(player,piece):
 				pos=board.ijToPos(i,j)
 				if verification.canMove(pos,kingPos,board):
 					threats.append(pos)
 	return threats
 
-
+# return a list of all possible moves for the player to solve the 'in check' situation
 def solveCheck(player,threats,board,captures):
 	'''
 	Ways to solve check
@@ -40,13 +39,13 @@ def solveCheck(player,threats,board,captures):
 	if len(threats)==1:
 		dropPoses=checkRoute(threats[0],kingPos,board)
 	
-	for i in range(0,5):
-		for j in range(0,5):
+	for i in range(0,config.BOARD_SIZE):
+		for j in range(0,config.BOARD_SIZE):
 			piece=board.get_ij(i,j)
 			piece_type=piece.lower()
 			pos=board.ijToPos(i,j)
 
-			if piece!='' and piece.islower()==player.islower() and (piece_type=='k' or len(threats)==1):
+			if piece!='' and verification.ownPiece(player,piece) and (piece_type=='k' or len(threats)==1):
 				# try 'move's
 				for m in config.MoveRules[piece_type]:
 					nextPos=board.ijToPos(i+m[0],j+m[1])
@@ -55,7 +54,7 @@ def solveCheck(player,threats,board,captures):
 						solutions.append(' '.join(moveOption))
 			elif piece=='' and len(threats)==1 and [i,j] in dropPoses:
 				# try 'drop's
-				for cap_p in captures._caps[player]:
+				for cap_p in captures.getCaptures(player):
 					moveOption=['drop',cap_p.lower(),pos]
 					if verification.validMove(moveOption,player,board,captures):
 						solutions.append(' '.join(moveOption))
@@ -64,8 +63,7 @@ def solveCheck(player,threats,board,captures):
 	solutions.sort()
 	return solutions
 
-# return a list of positions between threat and king
-
+# return a list of positions on the route between the king and the piece that checks the king
 def checkRoute(threatPos,kingPos,board):
 	ti=board.getRow(threatPos)
 	tj=board.getCol(threatPos)
@@ -83,7 +81,7 @@ def checkRoute(threatPos,kingPos,board):
 		j+=dj
 	return routes
 
-
+# check if this move will result in a check for the player itself
 def movingIntoCheck(begPos,endPos,player,board):
 	endPiece=board.get(endPos)
 	begPiece=board.get(begPos)

@@ -1,7 +1,7 @@
 '''
 Author: Anjie Wang
 File: minishogi_driver.py
-Descrition: 
+Descrition: read in command line arguments and launch the game
 '''
 
 from minishogi import Minishogi
@@ -9,7 +9,7 @@ import sys
 import utils
 import config
 
-# verify and process arguments
+# verify command line arguments and generate a Minishogi game as specified
 def processArgv(argv):
 	if len(argv)==2 and argv[1]=="-i":
 		#interactive mode
@@ -21,9 +21,12 @@ def processArgv(argv):
 		# invalid argvs
 		return None
 
-if __name__=="__main__":
+def main():
 	game=processArgv(sys.argv)
 	if game!=None:
 		game.play()
 	else:
-		print 'invalid arguments'
+		print 'Invalid arguments!'
+
+if __name__=="__main__":
+	main()

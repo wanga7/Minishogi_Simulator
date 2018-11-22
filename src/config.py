@@ -1,7 +1,12 @@
 # Author: Anjie Wang
 # File: config.py
-# Description: 
+# Description: store general configurations for the game
 
+
+# board size
+BOARD_SIZE=5
+
+# MoveRules for each piece type
 # "lower" player: begPos-endPos, "UPPER" plaer: endPos-begPos
 MoveRules={}
 MoveRules['k']=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
@@ -18,13 +23,17 @@ MoveRules['+p']=MoveRules['g']
 # move limit
 MOVE_LIMIT=400
 
-# msg
+# game ending messages
 TIE_MSG='Tie game.  Too many moves.'
 ILLEGAL_MSG='Illegal move.'
 CHECK_MSG='Checkmate.'
 
+# initial game state for interactive mode ('-i')
 DEFAULT_STATE_FILEPATH='defaultState.in'
 
+# all valid piece types
 PIECE_TYPE=['p','g','k','s','b','r']
+
+# players' names
 LOWER_PLAYER='lower'
 UPPER_PLAYER='UPPER'
