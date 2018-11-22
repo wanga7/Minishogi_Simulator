@@ -1,1 +1,1 @@
-python ../src/Minishogi.py -f
+python ../src/minishogi_driver.py -f

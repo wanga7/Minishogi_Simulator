@@ -1,3 +1,7 @@
+# Author: Box
+# File: utils.py
+# Description: handle input and output
+
 import os
 
 def _stringifySquare(sq):

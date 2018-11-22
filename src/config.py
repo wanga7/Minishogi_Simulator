@@ -1,5 +1,5 @@
-# Anjie Wang
-# Config.py
+# Author: Anjie Wang
+# File: config.py
 # Description: 
 
 # "lower" player: begPos-endPos, "UPPER" plaer: endPos-begPos
@@ -23,3 +23,8 @@ TIE_MSG='Tie game.  Too many moves.'
 ILLEGAL_MSG='Illegal move.'
 CHECK_MSG='Checkmate.'
 
+DEFAULT_STATE_FILEPATH='defaultState.in'
+
+PIECE_TYPE=['p','g','k','s','b','r']
+LOWER_PLAYER='lower'
+UPPER_PLAYER='UPPER'
