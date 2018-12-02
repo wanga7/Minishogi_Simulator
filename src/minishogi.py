@@ -48,7 +48,7 @@ class Minishogi:
 
 			# read in next move (-i,-f)
 			if self._mode=='i':
-				move=raw_input(player+'> ').split(' ')
+				move=raw_input(self.player+'> ').split(' ')
 				self.displayAction(self.player,move)
 			else:
 				if self.stepCnt>=len(self._moves):
