@@ -1,7 +1,4 @@
-# box-take-home
-Box Take-Home Exercise
-
-# Overview
+# Project Overview
 This project implements a MiniShogi game with two modes: file mode ('-f') and interactive mode ('-i'). Details about Minishogi game and the two modes can be found in `MiniShogi Specification.md`.
 
 # Architecture
